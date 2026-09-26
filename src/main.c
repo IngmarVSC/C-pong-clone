@@ -1,6 +1,6 @@
-#include <raylib.h>
 #include <math.h>
-
+#include <raylib.h>
+#include <stdlib.h>
 
 // screen dimensions
 const int SCREENWIDTH = 800;
@@ -8,7 +8,6 @@ const int SCREENHEIGHT = 700;
 
 // gamestates
 typedef enum { STATE_MENU, STATE_PLAYING, STATE_WIN } GameState;
-
 GameState state = STATE_MENU;
 
 // paddles struct
@@ -26,19 +25,16 @@ typedef struct {
   float dirX, dirY;
 } Ball;
 
-// sounds
 Sound losePoint;
 Sound gainPoint;
 Sound startGame;
 
 // paddles
 Paddle leftpaddle = {50, 200, 20, 100, 5};
-Paddle rightpaddle = {730, 200, 20, 100, 4};
+Paddle rightpaddle = {730, 200, 20, 100, 5};
 
 // ball
-Ball ball = {SCREENWIDTH / 2.0f, 
-            SCREENHEIGHT / 2.0f, 
-            10, 7.0f, 1.0f, 0.0f }; //radius, speed, horizontal direction, vertical direction
+Ball ball = {SCREENWIDTH / 2.0f, SCREENHEIGHT / 2.0f, 10, 7.0f, 1.0f, 0.0f};
 
 // scores
 int leftScore;
@@ -53,14 +49,11 @@ void MovePaddle(void);
 void UpdateDifficulty(int leftScore, Ball *ball);
 void ResetBall(Ball *ball);
 void CpuPaddle(Paddle *paddle);
-
 void DrawScreen(void);
 void DrawWinScreen(void);
 void DrawMainMenu(void);
-
 void UpdateGame(void);
 void UpdateMenu(void);
-
 void ChooseWinner(void);
 static void ResetGame(void);
 
@@ -70,28 +63,29 @@ int main() {
   InitAudioDevice();
 
   // load sounds
-  losePoint = LoadSound("resources/lose_point.wav");
-  gainPoint = LoadSound("resources/point_up.wav");
-  startGame = LoadSound("resources/start_game.wav");
+  losePoint = LoadSound("../resources/lose_point.wav");
+  gainPoint = LoadSound("../resources/point_up.wav");
+  startGame = LoadSound("../resources/start_game.wav");
 
   // fps
   SetTargetFPS(60);
 
   // main game loop
   while (!WindowShouldClose()) {
-
     // update game
     switch (state) {
-
     case STATE_MENU:
       UpdateMenu();
       break;
-
     case STATE_PLAYING:
       UpdateGame();
       break;
-
     case STATE_WIN:
+      // Update win screen logic (check for restart)
+      if (IsKeyPressed(KEY_SPACE)) {
+        ResetGame();
+        state = STATE_PLAYING;
+      }
       break;
     }
 
@@ -100,31 +94,24 @@ int main() {
 
     // draw game
     switch (state) {
-
     case STATE_MENU:
       DrawMainMenu();
       break;
-
     case STATE_PLAYING:
       DrawScreen();
       break;
-
     case STATE_WIN:
       DrawWinScreen();
       break;
     }
-
     EndDrawing();
   }
 
   UnloadSound(losePoint);
   UnloadSound(gainPoint);
   UnloadSound(startGame);
-
   CloseAudioDevice();
-
   CloseWindow();
-
   return 0;
 }
 
@@ -138,7 +125,7 @@ void MovePaddle() {
   }
 }
 
-// check paddle collision
+// check paddle collision (verplaatst naar buiten MovePaddle)
 void PaddleCollision(Ball *ball, Paddle *paddle, int direction) {
   int paddleCenter = paddle->y + paddle->height / 2;
   int difference = ball->y - paddleCenter;
@@ -146,17 +133,15 @@ void PaddleCollision(Ball *ball, Paddle *paddle, int direction) {
   if (CheckCollisionCircleRec(
           (Vector2){ball->x, ball->y}, ball->radius,
           (Rectangle){paddle->x, paddle->y, paddle->width, paddle->height})) {
-
     ball->x += 5 * direction; // prevent clipping
-
     ball->dirX = direction;
     ball->dirY = difference * 0.05f;
-    
-    // normalize dir by dividing each vector by its length (length = sqrt vec1^2 + vec2^2)
-    float directionLength = sqrtf(ball->dirX * ball->dirX  + ball->dirY * ball->dirY);
+
+    // normalize
+    float directionLength =
+        sqrtf(ball->dirX * ball->dirX + ball->dirY * ball->dirY);
     ball->dirX /= directionLength;
     ball->dirY /= directionLength;
-    // not normalizing explodes the ball's speed when it hits a side
   }
 }
 
@@ -166,7 +151,7 @@ static void ResetGame(void) {
   rightScore = 0;
   ball.x = SCREENWIDTH / 2.0f;
   ball.y = SCREENHEIGHT / 2.0f;
-  ball.speed = 5.0f;
+  ball.speed = 7.0f;
   ball.dirX = 1.0f;
   ball.dirY = 0.0f;
   leftpaddle.y = 200;
@@ -177,9 +162,7 @@ void ChooseWinner(void) {
   if (leftScore >= 10) {
     winner = 1; // left player wins
     state = STATE_WIN;
-  }
-
-  else if (rightScore >= 10) {
+  } else if (rightScore >= 10) {
     winner = 2; // right player wins
     state = STATE_WIN;
   }
@@ -188,8 +171,10 @@ void ChooseWinner(void) {
 void ResetBall(Ball *ball) {
   ball->x = SCREENWIDTH / 2.0f;
   ball->y = SCREENHEIGHT / 2.0f;
-  ball->dirX = 1;
-  ball->dirY *= 0;
+  ball->dirX = (ball->dirX > 0)
+                   ? -1
+                   : 1; // Stuur bal naar de speler die net gescoord heeft
+  ball->dirY = 0;
 }
 
 // draw line in the middle
@@ -204,14 +189,11 @@ void drawline(void) {
 
 void DrawScreen(void) {
   drawline();
-
   DrawText(TextFormat("%d", leftScore), 150, 100, 20,
            GRAY); // left player's points
   DrawText(TextFormat("%d", rightScore), 650, 100, 20,
            GRAY); // right player's points
-
   DrawCircle(ball.x, ball.y, ball.radius, RED);
-
   DrawRectangle(leftpaddle.x, leftpaddle.y, leftpaddle.width, leftpaddle.height,
                 GRAY);
   DrawRectangle(rightpaddle.x, rightpaddle.y, rightpaddle.width,
@@ -221,19 +203,11 @@ void DrawScreen(void) {
 void DrawWinScreen(void) {
   if (winner == 1) {
     DrawText("LEFT PLAYER WINS!", 250, 300, 30, WHITE);
-  }
-
-  else if (winner == 2) {
+  } else if (winner == 2) {
     DrawText("RIGHT PLAYER WINS!", 250, 300, 30, WHITE);
   }
-
   DrawText("Press Space to restart!", 280, 350, 20, GRAY);
   DrawText("Press Escape to quit", 320, 500, 15, GRAY);
-
-  if (IsKeyPressed(KEY_SPACE)) {
-    ResetGame();
-    state = STATE_PLAYING;
-  }
 }
 
 void MoveBall(void) {
@@ -249,12 +223,12 @@ void UpdateGame(void) {
   MovePaddle();
   CpuPaddle(&rightpaddle);
 
-  // ball collision screenborders (no collision with screensides obviously)
+  // ball collision screenborders
   if (ball.y - ball.radius <= 0) {
-    ball.y += 10;
-    ball.dirY *= -1; // flips direction
+    ball.y = ball.radius; // Voorkom dat de bal vastloopt in de muur
+    ball.dirY *= -1;
   } else if (ball.y + ball.radius >= SCREENHEIGHT) {
-    ball.y -= 10;
+    ball.y = SCREENHEIGHT - ball.radius;
     ball.dirY *= -1;
   }
 
@@ -262,13 +236,12 @@ void UpdateGame(void) {
   PaddleCollision(&ball, &leftpaddle, 1);
   PaddleCollision(&ball, &rightpaddle, -1);
 
-  // reset ball
+  // points
   if (ball.x - ball.radius < 0) {
     PlaySound(losePoint);
     ResetBall(&ball);
     rightScore += 1;
   }
-
   if (ball.x + ball.radius > SCREENWIDTH) {
     PlaySound(gainPoint);
     ResetBall(&ball);
@@ -292,32 +265,27 @@ void UpdateMenu(void) {
 
 void CpuPaddle(Paddle *paddle) {
   if (ball.dirX > 0) {
-    int paddleCenter = paddle->y + paddle->height / 2; // find paddle's center
-    int deadzone = 10; // makes cpu not track the exact y value of the ball
+    int paddleCenter = paddle->y + paddle->height / 2;
+    int deadzone = 10;
 
     if (paddleCenter < ball.y - deadzone &&
-        paddle->y + paddle->height <
-            SCREENHEIGHT) { // move down if ball is lower then paddle
+        (paddle->y + paddle->height < SCREENHEIGHT)) {
       paddle->y += paddle->speed;
-    } 
-    else if (paddleCenter > ball.y + deadzone &&
-               paddle->y > 0) { // move up if ball is higher then paddle
+    }
+    // Gecorrigeerde afgebroken if-statement:
+    else if (paddleCenter > ball.y + deadzone && paddle->y > 0) {
       paddle->y -= paddle->speed;
     }
   }
 }
 
 // updates difficulty based in player score
-void UpdateDifficulty(int leftScore, Ball *ball){
-  if (leftScore >= 2){
+void UpdateDifficulty(int leftScore, Ball *ball) {
+  if (leftScore >= 8) {
     ball->speed += 0.5f;
-  }
-  else if (leftScore >= 5){
+  } else if (leftScore >= 5) {
     ball->speed += 0.5f;
-  }
-
-  else if (leftScore >= 8){
-    ball->speed +=1.0f;
+  } else if (leftScore >= 2) {
+    ball->speed += 1.0f;
   }
 }
-
