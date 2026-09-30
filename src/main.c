@@ -146,7 +146,7 @@ void PaddleCollision(Ball *ball, Paddle *paddle, int direction) {
 }
 
 // reset everything
-static void ResetGame(void) {
+void ResetGame(void) {
   leftScore = 0;
   rightScore = 0;
   ball.x = SCREENWIDTH / 2.0f;
